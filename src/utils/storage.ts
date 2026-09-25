@@ -10,14 +10,14 @@ import {
 import { formatDateToISO } from './dateUtils';
 
 const STORAGE_KEYS = {
-  SESSIONS: 'estudoflux_sessions_v1',
-  DAY_RECORDS: 'estudoflux_day_records_v1',
-  SUBJECTS: 'estudoflux_subjects_v1',
-  GOALS: 'estudoflux_goals_v1',
-  REWARDS: 'estudoflux_rewards_v1',
-  REDEMPTIONS: 'estudoflux_redemptions_v1',
-  POINTS: 'estudoflux_points_v1',
-  ACHIEVEMENTS: 'estudoflux_achievements_v1',
+  SESSIONS: 'estudoflux_clean_sessions_v3',
+  DAY_RECORDS: 'estudoflux_clean_day_records_v3',
+  SUBJECTS: 'estudoflux_subjects_v3',
+  GOALS: 'estudoflux_goals_v3',
+  REWARDS: 'estudoflux_rewards_v3',
+  REDEMPTIONS: 'estudoflux_redemptions_v3',
+  POINTS: 'estudoflux_points_v3',
+  ACHIEVEMENTS: 'estudoflux_achievements_v3',
 };
 
 export const DEFAULT_SUBJECTS: SubjectItem[] = [
@@ -104,7 +104,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'sessions',
     tier: 'bronze',
     requirement: 1,
-    unlockedAt: '2026-09-01T10:00:00Z',
   },
   {
     id: 'ach-deep',
@@ -114,7 +113,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'sessions',
     tier: 'silver',
     requirement: 45,
-    unlockedAt: '2026-09-02T15:30:00Z',
   },
   {
     id: 'ach-daily-hit',
@@ -124,7 +122,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'goals',
     tier: 'bronze',
     requirement: 1,
-    unlockedAt: '2026-09-03T18:00:00Z',
   },
   {
     id: 'ach-daily-triad',
@@ -134,7 +131,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'goals',
     tier: 'silver',
     requirement: 3,
-    unlockedAt: '2026-09-08T20:00:00Z',
   },
   {
     id: 'ach-monthly-hit',
@@ -153,7 +149,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'streak',
     tier: 'bronze',
     requirement: 3,
-    unlockedAt: '2026-09-05T20:00:00Z',
   },
   {
     id: 'ach-streak-7',
@@ -163,7 +158,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'streak',
     tier: 'silver',
     requirement: 7,
-    unlockedAt: '2026-09-15T21:00:00Z',
   },
   {
     id: 'ach-streak-14',
@@ -191,7 +185,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'hours',
     tier: 'bronze',
     requirement: 10,
-    unlockedAt: '2026-09-10T14:00:00Z',
   },
   {
     id: 'ach-hours-25',
@@ -201,7 +194,6 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     category: 'hours',
     tier: 'silver',
     requirement: 25,
-    unlockedAt: '2026-09-20T17:00:00Z',
   },
   {
     id: 'ach-hours-50',
@@ -223,60 +215,11 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
   },
 ];
 
-// Generate realistic seeded history for current month up to today
-function generateSeedData() {
-  const sessions: StudySession[] = [];
-  const dayRecords: DayRecord[] = [];
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const todayDateNum = today.getDate();
-
-  // Seed study days in the current month prior to and including today
-  const seedDaysPattern = [1, 2, 3, 5, 6, 8, 9, 10, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 24, todayDateNum];
-  const subjectsList = ['Programação & Dev', 'Matemática & Lógica', 'Inglês & Idiomas', 'Concursos & Legislação'];
-
-  let idCounter = 1;
-  seedDaysPattern.forEach((dayNum) => {
-    if (dayNum <= todayDateNum) {
-      const d = new Date(year, month, dayNum);
-      const dateStr = formatDateToISO(d);
-
-      dayRecords.push({
-        date: dateStr,
-        manualMarked: true,
-        notes: dayNum % 3 === 0 ? 'Excelente ritmo de foco!' : undefined,
-      });
-
-      // 1 to 3 sessions per studied day
-      const sessionsCount = (dayNum % 3) + 1;
-      for (let s = 0; s < sessionsCount; s++) {
-        const duration = [25, 45, 50, 60][(dayNum + s) % 4];
-        const subject = subjectsList[(dayNum + s) % subjectsList.length];
-        const hour = 9 + s * 3;
-        sessions.push({
-          id: `seed-sess-${idCounter++}`,
-          date: dateStr,
-          startTime: `${String(hour).padStart(2, '0')}:15`,
-          durationMinutes: duration,
-          subject: subject,
-          notes: s === 0 ? 'Foco profundo em conceitos essenciais' : 'Exercícios práticos e fixação',
-          completedAt: new Date(year, month, dayNum, hour, 45).toISOString(),
-        });
-      }
-    }
-  });
-
-  return { sessions, dayRecords };
-}
-
 export function loadSessions(): StudySession[] {
   const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
   if (!raw) {
-    const seed = generateSeedData();
-    saveSessions(seed.sessions);
-    saveDayRecords(seed.dayRecords);
-    return seed.sessions;
+    saveSessions([]);
+    return [];
   }
   try {
     return JSON.parse(raw);
@@ -292,9 +235,8 @@ export function saveSessions(sessions: StudySession[]) {
 export function loadDayRecords(): DayRecord[] {
   const raw = localStorage.getItem(STORAGE_KEYS.DAY_RECORDS);
   if (!raw) {
-    const seed = generateSeedData();
-    saveDayRecords(seed.dayRecords);
-    return seed.dayRecords;
+    saveDayRecords([]);
+    return [];
   }
   try {
     return JSON.parse(raw);
@@ -361,24 +303,8 @@ export function saveRewards(rewards: RewardItem[]) {
 export function loadRedemptions(): RedemptionRecord[] {
   const raw = localStorage.getItem(STORAGE_KEYS.REDEMPTIONS);
   if (!raw) {
-    const defaultRedemptions: RedemptionRecord[] = [
-      {
-        id: 'red-1',
-        rewardId: 'rew-1',
-        rewardTitle: '1 Episódio da Série Favorita',
-        costPoints: 120,
-        redeemedAt: '2026-09-22T21:30:00Z',
-      },
-      {
-        id: 'red-2',
-        rewardId: 'rew-2',
-        rewardTitle: 'Café Especial / Sobremesa',
-        costPoints: 80,
-        redeemedAt: '2026-09-24T16:00:00Z',
-      },
-    ];
-    saveRedemptions(defaultRedemptions);
-    return defaultRedemptions;
+    saveRedemptions([]);
+    return [];
   }
   try {
     return JSON.parse(raw);
@@ -394,10 +320,8 @@ export function saveRedemptions(redemptions: RedemptionRecord[]) {
 export function loadPoints(): number {
   const raw = localStorage.getItem(STORAGE_KEYS.POINTS);
   if (raw === null) {
-    // Default initial starting balance from seeded sessions
-    const initialPoints = 480;
-    savePoints(initialPoints);
-    return initialPoints;
+    savePoints(0);
+    return 0;
   }
   const parsed = parseInt(raw, 10);
   return isNaN(parsed) ? 0 : parsed;

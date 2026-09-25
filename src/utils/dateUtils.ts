@@ -57,6 +57,35 @@ export function formatMinutesToReadable(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
+export function formatSecondsToReadable(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds <= 0) return '0s';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  if (hours > 0) {
+    if (minutes === 0 && seconds === 0) return `${hours}h`;
+    if (seconds === 0) return `${hours}h ${minutes}m`;
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    if (seconds === 0) return `${minutes} min`;
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+export function getSessionTotalSeconds(session: { durationMinutes: number; durationSeconds?: number; totalSeconds?: number }): number {
+  if (typeof session.totalSeconds === 'number' && !isNaN(session.totalSeconds)) {
+    return session.totalSeconds;
+  }
+  const mins = session.durationMinutes || 0;
+  const secs = session.durationSeconds || 0;
+  return mins * 60 + secs;
+}
+
 export function formatSecondsToTimer(totalSeconds: number): string {
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;

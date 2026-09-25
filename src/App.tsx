@@ -9,9 +9,6 @@ import {
   StudySession,
   DayRecord,
   UserGoals,
-  RewardItem,
-  RedemptionRecord,
-  Achievement,
   RewardCelebration,
 } from './types';
 import {
@@ -21,41 +18,28 @@ import {
   saveDayRecords,
   loadGoals,
   saveGoals,
-  loadRewards,
-  saveRewards,
-  loadRedemptions,
-  saveRedemptions,
-  loadPoints,
-  savePoints,
-  loadAchievements,
-  saveAchievements,
-  calculateStreak,
   DEFAULT_GOALS,
-  DEFAULT_REWARDS,
-  INITIAL_ACHIEVEMENTS,
 } from './utils/storage';
-import { getTodayDateString, formatMinutesToReadable } from './utils/dateUtils';
+import {
+  getTodayDateString,
+  formatMinutesToReadable,
+  formatSecondsToReadable,
+  getSessionTotalSeconds,
+} from './utils/dateUtils';
 import { Navbar } from './components/Navbar';
 import { CalendarView } from './components/CalendarView';
 import { FocusTimer } from './components/FocusTimer';
 import { DailyReportView } from './components/DailyReportView';
 import { MonthlyReportView } from './components/MonthlyReportView';
-import { RewardsView } from './components/RewardsView';
 import { ManualSessionModal } from './components/ManualSessionModal';
 import { GoalSettingsModal } from './components/GoalSettingsModal';
 import { RewardCelebrationModal } from './components/RewardCelebrationModal';
-import confetti from 'canvas-confetti';
-import { playRewardFanfare } from './utils/audio';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('calendar');
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [dayRecords, setDayRecords] = useState<DayRecord[]>([]);
   const [goals, setGoals] = useState<UserGoals>(DEFAULT_GOALS);
-  const [rewards, setRewards] = useState<RewardItem[]>([]);
-  const [redemptions, setRedemptions] = useState<RedemptionRecord[]>([]);
-  const [points, setPoints] = useState<number>(0);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   // Modals state
   const [showManualModal, setShowManualModal] = useState<boolean>(false);
@@ -73,77 +57,34 @@ export default function App() {
     }, 3500);
   };
 
-  // Initial load from storage
+  // Initial load from storage (Starts 100% clean with no markings)
   useEffect(() => {
     setSessions(loadSessions());
     setDayRecords(loadDayRecords());
     setGoals(loadGoals());
-    setRewards(loadRewards());
-    setRedemptions(loadRedemptions());
-    setPoints(loadPoints());
-    setAchievements(loadAchievements());
   }, []);
 
-  // Compute studied dates set for streak calculation
-  const studiedDatesSet = new Set<string>();
-  sessions.forEach((s) => studiedDatesSet.add(s.date));
-  dayRecords.filter((dr) => dr.manualMarked).forEach((dr) => studiedDatesSet.add(dr.date));
-
-  const { currentStreak, bestStreak } = calculateStreak(studiedDatesSet);
-
-  // Minutes studied today
+  // Seconds and minutes studied today
   const todayStr = getTodayDateString();
-  const dailyMinutesToday = sessions
+  const dailySecondsToday = sessions
     .filter((s) => s.date === todayStr)
-    .reduce((acc, s) => acc + s.durationMinutes, 0);
+    .reduce((acc, s) => acc + getSessionTotalSeconds(s), 0);
+  const dailyMinutesToday = Math.round(dailySecondsToday / 60);
 
-  // Total study minutes across all time
-  const totalStudyMinutes = sessions.reduce((acc, s) => acc + s.durationMinutes, 0);
-
-  // Check achievements helper
-  const evaluateAchievements = (
-    currentSessions: StudySession[],
-    streak: number,
-    totalMins: number,
-    currentDayMins: number
+  // Handle study session completed via Timer (Iniciar / Parar)
+  const handleSessionComplete = (
+    durationMinutes: number,
+    durationSeconds: number,
+    totalSeconds: number,
+    notes?: string
   ) => {
-    let updated = false;
-    const nowIso = new Date().toISOString();
-    const newAchievements = achievements.map((ach) => {
-      if (ach.unlockedAt) return ach;
-
-      let shouldUnlock = false;
-      if (ach.id === 'ach-first' && currentSessions.length >= 1) shouldUnlock = true;
-      if (ach.id === 'ach-deep' && currentSessions.some((s) => s.durationMinutes >= 45)) shouldUnlock = true;
-      if (ach.id === 'ach-daily-hit' && currentDayMins >= goals.dailyMinutes) shouldUnlock = true;
-      if (ach.id === 'ach-streak-3' && streak >= 3) shouldUnlock = true;
-      if (ach.id === 'ach-streak-7' && streak >= 7) shouldUnlock = true;
-      if (ach.id === 'ach-streak-14' && streak >= 14) shouldUnlock = true;
-      if (ach.id === 'ach-hours-10' && totalMins >= 10 * 60) shouldUnlock = true;
-      if (ach.id === 'ach-hours-25' && totalMins >= 25 * 60) shouldUnlock = true;
-      if (ach.id === 'ach-hours-50' && totalMins >= 50 * 60) shouldUnlock = true;
-
-      if (shouldUnlock) {
-        updated = true;
-        showToast(`🏆 Conquista Desbloqueada: ${ach.title}!`);
-        return { ...ach, unlockedAt: nowIso };
-      }
-      return ach;
-    });
-
-    if (updated) {
-      setAchievements(newAchievements);
-      saveAchievements(newAchievements);
-    }
-  };
-
-  // Handle focus session completed via Timer (Iniciar / Parar)
-  const handleSessionComplete = (durationMinutes: number, notes?: string) => {
     const newSession: StudySession = {
       id: `sess-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       date: todayStr,
       startTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       durationMinutes,
+      durationSeconds,
+      totalSeconds,
       subject: 'Prática Musical',
       notes: notes || undefined,
       completedAt: new Date().toISOString(),
@@ -153,7 +94,7 @@ export default function App() {
     setSessions(newSessions);
     saveSessions(newSessions);
 
-    // Ensure day is marked as studied
+    // Ensure day is marked as studied in the calendar
     let newDayRecords = [...dayRecords];
     const existingDayRecord = newDayRecords.find((dr) => dr.date === todayStr);
     if (!existingDayRecord) {
@@ -164,68 +105,79 @@ export default function App() {
     setDayRecords(newDayRecords);
     saveDayRecords(newDayRecords);
 
-    // Calculate points earned (1 min = 1 point)
-    let pointsEarned = durationMinutes;
+    // Check if daily goal reached
     const prevDayMins = dailyMinutesToday;
-    const newDayMins = prevDayMins + durationMinutes;
+    const newDayMins = prevDayMins + Math.round(totalSeconds / 60);
 
-    // Check if daily goal reached for first time today -> trigger visual reward celebration!
     if (prevDayMins < goals.dailyMinutes && newDayMins >= goals.dailyMinutes) {
-      pointsEarned += 50;
       setCelebrationModal({
         type: 'daily_goal',
         title: 'Meta Diária Conquistada!',
-        subtitle: `Parabéns! Você alcançou ${formatMinutesToReadable(newDayMins)} de estudo musical hoje, cumprindo sua meta diária de ${formatMinutesToReadable(goals.dailyMinutes)}.`,
-        pointsEarned: 50,
+        subtitle: `Parabéns! Você alcançou ${formatSecondsToReadable(dailySecondsToday + totalSeconds)} de estudo musical hoje, cumprindo sua meta diária de ${formatMinutesToReadable(goals.dailyMinutes)}.`,
+        pointsEarned: 0,
         badgeTier: 'bronze',
       });
-    } else {
-      showToast(`+${durationMinutes} pontos de foco adicionados ao seu saldo!`);
     }
 
-    const updatedPoints = points + pointsEarned;
-    setPoints(updatedPoints);
-    savePoints(updatedPoints);
-
-    // Evaluate achievements
-    const newDatesSet = new Set(studiedDatesSet);
-    newDatesSet.add(todayStr);
-    const { currentStreak: newStreak } = calculateStreak(newDatesSet);
-    evaluateAchievements(newSessions, newStreak, totalStudyMinutes + durationMinutes, newDayMins);
+    showToast(`${formatSecondsToReadable(totalSeconds)} salvos no calendário com sucesso!`);
   };
 
-  // Toggle manual day marked status
+  // Toggle manual day marked status in calendar
+  // When unmarking: ZEROS the study time as requested!
   const handleToggleDayMarked = (dateStr: string) => {
-    let newRecords: DayRecord[];
-    const existing = dayRecords.find((dr) => dr.date === dateStr);
+    const existingRecord = dayRecords.find((dr) => dr.date === dateStr);
+    const daySessions = sessions.filter((s) => s.date === dateStr);
+    const isCurrentlyMarked = existingRecord?.manualMarked || daySessions.length > 0;
 
-    if (existing) {
-      newRecords = dayRecords.map((dr) =>
-        dr.date === dateStr ? { ...dr, manualMarked: !dr.manualMarked } : dr
-      );
+    if (isCurrentlyMarked) {
+      // Unmarking: zeros the study time for this date!
+      const newSessions = sessions.filter((s) => s.date !== dateStr);
+      setSessions(newSessions);
+      saveSessions(newSessions);
+
+      const newDayRecords = dayRecords.filter((dr) => dr.date !== dateStr);
+      setDayRecords(newDayRecords);
+      saveDayRecords(newDayRecords);
+
+      showToast(`Dia desmarcado e tempo de estudo zerado no calendário.`);
     } else {
-      newRecords = [...dayRecords, { date: dateStr, manualMarked: true }];
+      // Marking the day
+      const newDayRecords = [
+        ...dayRecords.filter((dr) => dr.date !== dateStr),
+        { date: dateStr, manualMarked: true },
+      ];
+      setDayRecords(newDayRecords);
+      saveDayRecords(newDayRecords);
+
+      showToast('Dia marcado como estudado ✓');
     }
-
-    setDayRecords(newRecords);
-    saveDayRecords(newRecords);
-
-    const isNowMarked = newRecords.find((dr) => dr.date === dateStr)?.manualMarked;
-    showToast(isNowMarked ? 'Dia marcado como praticado ✓' : 'Marcação do dia removida.');
   };
 
-  // Add manual session
+  // Clear all markings from calendar
+  const handleClearAllMarkings = () => {
+    setSessions([]);
+    saveSessions([]);
+    setDayRecords([]);
+    saveDayRecords([]);
+    showToast('Calendário limpo: todas as marcações foram removidas.');
+  };
+
+  // Add manual session with minutes and seconds
   const handleSaveManualSession = (
     date: string,
     durationMinutes: number,
+    durationSeconds: number,
     startTime: string,
     notes?: string
   ) => {
+    const totalSeconds = durationMinutes * 60 + durationSeconds;
     const newSession: StudySession = {
       id: `manual-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       date,
       startTime,
       durationMinutes,
+      durationSeconds,
+      totalSeconds,
       subject: 'Prática Musical',
       notes: notes || undefined,
       completedAt: new Date().toISOString(),
@@ -246,17 +198,7 @@ export default function App() {
     setDayRecords(newDayRecords);
     saveDayRecords(newDayRecords);
 
-    // Add points
-    const updatedPoints = points + durationMinutes;
-    setPoints(updatedPoints);
-    savePoints(updatedPoints);
-
-    showToast(`${durationMinutes}m de prática registrados com sucesso (+${durationMinutes} pts)!`);
-
-    const newDatesSet = new Set(studiedDatesSet);
-    newDatesSet.add(date);
-    const { currentStreak: newStreak } = calculateStreak(newDatesSet);
-    evaluateAchievements(newSessions, newStreak, totalStudyMinutes + durationMinutes, dailyMinutesToday);
+    showToast(`${formatSecondsToReadable(totalSeconds)} registrados no dia ${date}!`);
   };
 
   // Delete session
@@ -267,45 +209,14 @@ export default function App() {
     showToast('Sessão removida.');
   };
 
-  // Redeem reward
-  const handleRedeemReward = (reward: RewardItem) => {
-    if (points < reward.costPoints) return;
-
-    const newPoints = points - reward.costPoints;
-    setPoints(newPoints);
-    savePoints(newPoints);
-
-    const updatedRewards = rewards.map((r) =>
-      r.id === reward.id ? { ...r, redeemedCount: r.redeemedCount + 1 } : r
+  // Update session notes
+  const handleUpdateSessionNotes = (sessionId: string, newNotes: string) => {
+    const newSessions = sessions.map((s) =>
+      s.id === sessionId ? { ...s, notes: newNotes.trim() || undefined } : s
     );
-    setRewards(updatedRewards);
-    saveRewards(updatedRewards);
-
-    const newRedemption: RedemptionRecord = {
-      id: `red-${Date.now()}`,
-      rewardId: reward.id,
-      rewardTitle: reward.title,
-      costPoints: reward.costPoints,
-      redeemedAt: new Date().toISOString(),
-    };
-    const updatedRedemptions = [newRedemption, ...redemptions];
-    setRedemptions(updatedRedemptions);
-    saveRedemptions(updatedRedemptions);
-
-    showToast(`Recompensa resgatada: "${reward.title}"! Aproveite seu descanso!`);
-  };
-
-  // Add custom reward
-  const handleAddCustomReward = (customReward: Omit<RewardItem, 'id' | 'redeemedCount'>) => {
-    const newReward: RewardItem = {
-      ...customReward,
-      id: `rew-${Date.now()}`,
-      redeemedCount: 0,
-    };
-    const updated = [newReward, ...rewards];
-    setRewards(updated);
-    saveRewards(updated);
-    showToast(`Recompensa "${newReward.title}" cadastrada na loja!`);
+    setSessions(newSessions);
+    saveSessions(newSessions);
+    showToast('Anotação atualizada com sucesso!');
   };
 
   // Save goals
@@ -318,15 +229,11 @@ export default function App() {
   // Export full JSON backup
   const handleExportAllData = () => {
     const backup = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       sessions,
       dayRecords,
       goals,
-      rewards,
-      redemptions,
-      points,
-      achievements,
     };
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -353,18 +260,6 @@ export default function App() {
         setGoals(data.goals);
         saveGoals(data.goals);
       }
-      if (data.rewards && Array.isArray(data.rewards)) {
-        setRewards(data.rewards);
-        saveRewards(data.rewards);
-      }
-      if (data.redemptions && Array.isArray(data.redemptions)) {
-        setRedemptions(data.redemptions);
-        saveRedemptions(data.redemptions);
-      }
-      if (typeof data.points === 'number') {
-        setPoints(data.points);
-        savePoints(data.points);
-      }
       return true;
     } catch (e) {
       console.error('Import error', e);
@@ -372,27 +267,23 @@ export default function App() {
     }
   };
 
-  // Reset to default
+  // Reset to default (Clean state)
   const handleResetToDefault = () => {
     localStorage.clear();
-    setSessions(loadSessions());
-    setDayRecords(loadDayRecords());
+    setSessions([]);
+    saveSessions([]);
+    setDayRecords([]);
+    saveDayRecords([]);
     setGoals(DEFAULT_GOALS);
-    setRewards(DEFAULT_REWARDS);
-    setRedemptions([]);
-    setPoints(480);
-    setAchievements(INITIAL_ACHIEVEMENTS);
-    showToast('Dados restaurados para o padrão.');
+    showToast('Calendário e dados limpos com sucesso.');
   };
 
   return (
     <div className="min-h-screen bg-neutral-50/60 font-sans text-neutral-900 flex flex-col">
-      {/* Top Bar Navigation */}
+      {/* Top Bar Navigation with Resized Mobile Buttons */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        streakCount={currentStreak}
-        points={points}
         onOpenSettings={() => setShowSettingsModal(true)}
       />
 
@@ -410,12 +301,14 @@ export default function App() {
               setShowManualModal(true);
             }}
             onStartTimerForToday={() => setActiveTab('timer')}
+            onClearAllMarkings={handleClearAllMarkings}
           />
         )}
 
         {activeTab === 'timer' && (
           <FocusTimer
             onSessionComplete={handleSessionComplete}
+            onNavigateToCalendar={() => setActiveTab('calendar')}
             soundEnabled={goals.soundEnabled}
             onToggleSound={() => handleSaveGoals({ ...goals, soundEnabled: !goals.soundEnabled })}
             dailyMinutesToday={dailyMinutesToday}
@@ -435,6 +328,7 @@ export default function App() {
             onDeleteSession={handleDeleteSession}
             onStartTimerForToday={() => setActiveTab('timer')}
             onTriggerCelebration={setCelebrationModal}
+            onUpdateSessionNotes={handleUpdateSessionNotes}
           />
         )}
 
@@ -449,40 +343,23 @@ export default function App() {
             onTriggerCelebration={setCelebrationModal}
           />
         )}
-
-        {activeTab === 'rewards' && (
-          <RewardsView
-            points={points}
-            totalStudyMinutes={totalStudyMinutes}
-            streakCount={currentStreak}
-            bestStreak={bestStreak}
-            rewards={rewards}
-            redemptions={redemptions}
-            achievements={achievements}
-            goals={goals}
-            onRedeemReward={handleRedeemReward}
-            onAddCustomReward={handleAddCustomReward}
-            onOpenSettings={() => setShowSettingsModal(true)}
-            onTriggerCelebration={setCelebrationModal}
-          />
-        )}
       </main>
 
       {/* Footer */}
       <footer className="mt-auto border-t border-neutral-200/80 bg-white py-4 text-center text-xs text-neutral-400">
         <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>EstudoFlux · Estudo Musical & Controle de Tempo</span>
-          <div className="flex items-center gap-4 text-neutral-500">
-            <button onClick={() => setActiveTab('calendar')} className="hover:text-neutral-900">
+          <div className="flex items-center gap-4 text-neutral-600 font-medium">
+            <button onClick={() => setActiveTab('calendar')} className="hover:text-neutral-950 cursor-pointer">
               Calendário
             </button>
-            <button onClick={() => setActiveTab('timer')} className="hover:text-neutral-900">
-              Tempo
+            <button onClick={() => setActiveTab('timer')} className="hover:text-neutral-950 cursor-pointer">
+              Cronômetro
             </button>
-            <button onClick={() => setActiveTab('daily')} className="hover:text-neutral-900">
+            <button onClick={() => setActiveTab('daily')} className="hover:text-neutral-950 cursor-pointer">
               Relatório Diário
             </button>
-            <button onClick={() => setActiveTab('monthly')} className="hover:text-neutral-900">
+            <button onClick={() => setActiveTab('monthly')} className="hover:text-neutral-950 cursor-pointer">
               Relatório Mensal
             </button>
           </div>
@@ -510,7 +387,7 @@ export default function App() {
         />
       )}
 
-      {/* Visual Reward Celebration Modal */}
+      {/* Visual Celebration Modal */}
       {celebrationModal && (
         <RewardCelebrationModal
           celebration={celebrationModal}
@@ -521,7 +398,7 @@ export default function App() {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 animate-fade-in flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">
+        <div className="fixed bottom-20 md:bottom-6 right-6 z-50 animate-fade-in flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">
           <span>{toastMessage}</span>
         </div>
       )}

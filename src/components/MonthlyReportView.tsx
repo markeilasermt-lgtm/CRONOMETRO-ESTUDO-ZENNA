@@ -3,6 +3,8 @@ import { StudySession, DayRecord, UserGoals, RewardCelebration } from '../types'
 import {
   MONTH_NAMES_PT,
   formatMinutesToReadable,
+  formatSecondsToReadable,
+  getSessionTotalSeconds,
 } from '../utils/dateUtils';
 import {
   Clock,
@@ -67,8 +69,9 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
 
   // Month sessions
   const monthSessions = sessions.filter((s) => s.date.startsWith(monthPrefix));
-  const totalMinutesMonth = monthSessions.reduce((acc, s) => acc + s.durationMinutes, 0);
-  const totalHoursMonth = Math.round((totalMinutesMonth / 60) * 10) / 10;
+  const totalSecondsMonth = monthSessions.reduce((acc, s) => acc + getSessionTotalSeconds(s), 0);
+  const totalMinutesMonth = Math.round(totalSecondsMonth / 60);
+  const totalHoursMonth = Math.round((totalSecondsMonth / 3600) * 10) / 10;
 
   // Active days count
   const activeDaysSet = new Set<string>();
@@ -279,7 +282,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
             <span className="font-mono text-3xl font-extrabold text-neutral-900 tabular-nums">
               {totalHoursMonth}h
             </span>
-            <span className="text-xs text-neutral-500">({formatMinutesToReadable(totalMinutesMonth)})</span>
+            <span className="text-xs text-neutral-500">({formatSecondsToReadable(totalSecondsMonth)})</span>
           </div>
           <div className="mt-2 text-xs text-neutral-500">
             {monthSessions.length} sessões de música concluídas

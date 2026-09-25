@@ -3,6 +3,8 @@ export interface StudySession {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   durationMinutes: number;
+  durationSeconds?: number;
+  totalSeconds?: number;
   subject?: string;
   notes?: string;
   completedAt: string; // ISO
@@ -71,4 +73,4 @@ export interface RewardCelebration {
   levelTitle?: string;
 }
 
-export type ActiveTab = 'calendar' | 'timer' | 'daily' | 'monthly' | 'rewards';
+export type ActiveTab = 'calendar' | 'timer' | 'daily' | 'monthly';

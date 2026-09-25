@@ -156,8 +156,8 @@ export const GoalSettingsModal: React.FC<GoalSettingsModalProps> = ({
                 <VolumeX className="h-5 w-5 text-neutral-400" />
               )}
               <div>
-                <span className="text-xs font-semibold text-neutral-900 block">Sons & Chimes do Cronômetro</span>
-                <span className="text-[11px] text-neutral-500">Tocar sinal ao concluir sessões de foco</span>
+                <span className="text-xs font-semibold text-neutral-900 block">Sons do Cronômetro</span>
+                <span className="text-[11px] text-neutral-500">Tocar sinal ao concluir o tempo de estudo</span>
               </div>
             </div>
             <button
