@@ -109,7 +109,7 @@ export default function App() {
     const prevDayMins = dailyMinutesToday;
     const newDayMins = prevDayMins + Math.round(totalSeconds / 60);
 
-    if (prevDayMins < goals.dailyMinutes && newDayMins >= goals.dailyMinutes) {
+    if (goals.dailyMinutes > 0 && prevDayMins < goals.dailyMinutes && newDayMins >= goals.dailyMinutes) {
       setCelebrationModal({
         type: 'daily_goal',
         title: 'Meta Diária Conquistada!',

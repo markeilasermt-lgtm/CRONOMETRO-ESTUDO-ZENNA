@@ -87,15 +87,16 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
   const averageMinutesPerActiveDay = activeDaysCount > 0 ? Math.round(totalMinutesMonth / activeDaysCount) : 0;
 
   // Monthly goal progress
-  const monthlyGoalMinutes = goals.monthlyHours * 60;
-  const monthlyGoalPercent = Math.round((totalMinutesMonth / (monthlyGoalMinutes || 1)) * 100);
-  const isMonthlyGoalMet = totalMinutesMonth >= monthlyGoalMinutes;
+  const monthlyGoalHours = goals.monthlyHours || 0;
+  const monthlyGoalMinutes = monthlyGoalHours * 60;
+  const monthlyGoalPercent = monthlyGoalMinutes > 0 ? Math.round((totalMinutesMonth / monthlyGoalMinutes) * 100) : 0;
+  const isMonthlyGoalMet = monthlyGoalMinutes > 0 && totalMinutesMonth >= monthlyGoalMinutes;
 
   // Remaining days in month
   const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth();
   const daysPassed = isCurrentMonth ? today.getDate() : daysInMonth;
   const daysRemaining = Math.max(1, daysInMonth - daysPassed);
-  const hoursRemaining = Math.max(0, goals.monthlyHours - totalHoursMonth);
+  const hoursRemaining = Math.max(0, monthlyGoalHours - totalHoursMonth);
 
   // Daily time distribution
   const dailyData: { day: number; dateStr: string; minutes: number }[] = [];
@@ -232,12 +233,11 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
               <div>
                 <div className="flex items-center gap-2 justify-center sm:justify-start">
                   <span className="rounded-md bg-amber-200/60 px-2 py-0.5 text-[11px] font-bold text-amber-900 uppercase">
-                    Badge de Ouro Mensal
+                    Badge Mensal Conquistado
                   </span>
-                  <span className="text-xs text-amber-800 font-semibold">+200 Pts Bônus</span>
                 </div>
                 <h3 className="font-sans text-lg font-extrabold text-neutral-950 mt-0.5">
-                  Meta Mensal de {goals.monthlyHours} Horas Batida!
+                  Meta Mensal de {monthlyGoalHours} Horas Batida!
                 </h3>
                 <p className="text-xs text-neutral-600">
                   Você acumulou {totalHoursMonth} horas de estudo musical em {MONTH_NAMES_PT[selectedMonth]}.
@@ -250,20 +250,34 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
               className="shrink-0 flex items-center gap-1.5 rounded-xl bg-neutral-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-neutral-800 transition-colors shadow-xs"
             >
               <Sparkles className="h-4 w-4 text-amber-400" />
-              <span>Ver Selo & Celebração</span>
+              <span>Ver Celebração</span>
             </button>
           </div>
         </div>
-      ) : (
+      ) : monthlyGoalHours > 0 ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-xs text-neutral-600 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
             <Target className="h-5 w-5 text-indigo-600 shrink-0" />
             <div>
               <span className="font-semibold text-neutral-900 block">
-                Progresso Mensal: {totalHoursMonth}h de {goals.monthlyHours}h ({monthlyGoalPercent}%)
+                Progresso Mensal: {totalHoursMonth}h de {monthlyGoalHours}h ({monthlyGoalPercent}%)
               </span>
               <span className="text-neutral-500">
                 Faltam {hoursRemaining.toFixed(1)}h nos próximos {daysRemaining} dias para bater a meta.
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-xs text-neutral-600 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <Target className="h-5 w-5 text-neutral-400 shrink-0" />
+            <div>
+              <span className="font-semibold text-neutral-900 block">
+                Meta Mensal não configurada (Zerada)
+              </span>
+              <span className="text-neutral-500">
+                Você pode definir sua meta mensal de horas nas configurações (ícone de engrenagem) quando desejar.
               </span>
             </div>
           </div>
@@ -292,29 +306,42 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
         {/* Monthly Goal Progress */}
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Meta ({goals.monthlyHours}h)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Meta {monthlyGoalHours > 0 ? `(${monthlyGoalHours}h)` : ''}
+            </span>
             <Target className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="font-mono text-3xl font-extrabold text-neutral-900 tabular-nums">
-              {monthlyGoalPercent}%
-            </span>
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                monthlyGoalPercent >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
-              }`}
-            >
-              {monthlyGoalPercent >= 100 ? 'Batida!' : `${hoursRemaining.toFixed(1)}h restantes`}
-            </span>
-          </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                monthlyGoalPercent >= 100 ? 'bg-emerald-500' : 'bg-indigo-600'
-              }`}
-              style={{ width: `${Math.min(100, monthlyGoalPercent)}%` }}
-            />
-          </div>
+          {monthlyGoalHours > 0 ? (
+            <>
+              <div className="flex items-baseline justify-between">
+                <span className="font-mono text-3xl font-extrabold text-neutral-900 tabular-nums">
+                  {monthlyGoalPercent}%
+                </span>
+                <span
+                  className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                    monthlyGoalPercent >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                  }`}
+                >
+                  {monthlyGoalPercent >= 100 ? 'Batida!' : `${hoursRemaining.toFixed(1)}h restantes`}
+                </span>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    monthlyGoalPercent >= 100 ? 'bg-emerald-500' : 'bg-indigo-600'
+                  }`}
+                  style={{ width: `${Math.min(100, monthlyGoalPercent)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <span className="text-lg font-bold text-neutral-700 block">Zerada (0h)</span>
+              <span className="text-xs text-neutral-400 mt-1 block">
+                Insira sua meta nas configurações
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Consistency & Active Days */}

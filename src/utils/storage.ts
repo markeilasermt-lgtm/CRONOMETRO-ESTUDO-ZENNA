@@ -30,9 +30,9 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
 ];
 
 export const DEFAULT_GOALS: UserGoals = {
-  dailyMinutes: 120, // 2 horas por dia
-  monthlyHours: 45, // 45 horas por mês
-  weeklyHours: 12,
+  dailyMinutes: 0,
+  monthlyHours: 0,
+  weeklyHours: 0,
   soundEnabled: true,
 };
 
@@ -273,7 +273,13 @@ export function loadGoals(): UserGoals {
     return DEFAULT_GOALS;
   }
   try {
-    return { ...DEFAULT_GOALS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    // If goals are still the old initial placeholder (120 mins daily or 45 hrs monthly), zero them out
+    if ((parsed.dailyMinutes === 120 && parsed.monthlyHours === 45) || parsed.dailyMinutes === undefined) {
+      saveGoals(DEFAULT_GOALS);
+      return DEFAULT_GOALS;
+    }
+    return { ...DEFAULT_GOALS, ...parsed };
   } catch {
     return DEFAULT_GOALS;
   }

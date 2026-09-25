@@ -74,9 +74,9 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({
   const daySessions = sessions.filter((s) => s.date === selectedDate);
   const dayTotalSeconds = daySessions.reduce((acc, s) => acc + getSessionTotalSeconds(s), 0);
   const totalMinutes = Math.round(dayTotalSeconds / 60);
-  const goalMinutes = goals.dailyMinutes;
-  const goalPercentage = Math.round((totalMinutes / (goalMinutes || 1)) * 100);
-  const isGoalMet = totalMinutes >= goalMinutes;
+  const goalMinutes = goals.dailyMinutes || 0;
+  const goalPercentage = goalMinutes > 0 ? Math.round((totalMinutes / goalMinutes) * 100) : 0;
+  const isGoalMet = goalMinutes > 0 && totalMinutes >= goalMinutes;
 
   // Filter sessions that have notes
   const sessionsWithNotes = daySessions.filter((s) => s.notes && s.notes.trim().length > 0);
@@ -178,7 +178,7 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({
         </div>
       </div>
 
-      {/* Visual Banner when Goal is Met */}
+      {/* Visual Banner when Goal is Met or Zero */}
       {isGoalMet ? (
         <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-teal-50 to-green-50 p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -211,7 +211,7 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({
             </button>
           </div>
         </div>
-      ) : (
+      ) : goalMinutes > 0 ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-xs text-neutral-600 flex items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
             <Target className="h-5 w-5 text-indigo-600 shrink-0" />
@@ -221,6 +221,28 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({
               </span>
               <span className="text-neutral-500">
                 Meta do dia: {formatMinutesToReadable(goalMinutes)} · Concluído: {goalPercentage}%
+              </span>
+            </div>
+          </div>
+          {selectedDate === todayStr && (
+            <button
+              onClick={onStartTimerForToday}
+              className="rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shrink-0 cursor-pointer"
+            >
+              Praticar Agora
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-xs text-neutral-600 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <Target className="h-5 w-5 text-neutral-400 shrink-0" />
+            <div>
+              <span className="font-semibold text-neutral-900 block">
+                Meta diária não configurada (Zerada)
+              </span>
+              <span className="text-neutral-500">
+                Você pode definir sua meta diária nas configurações (ícone de engrenagem) quando desejar.
               </span>
             </div>
           </div>
@@ -257,22 +279,33 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({
             <span className="text-xs font-semibold uppercase tracking-wider">Meta Diária</span>
             <Target className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-extrabold text-neutral-900 tabular-nums">
-              {goalPercentage}%
-            </span>
-            <span className="text-xs font-medium text-neutral-500">
-              {isGoalMet ? 'Batida ✓' : 'Em Andamento'}
-            </span>
-          </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                isGoalMet ? 'bg-emerald-500' : 'bg-indigo-600'
-              }`}
-              style={{ width: `${Math.min(100, goalPercentage)}%` }}
-            />
-          </div>
+          {goalMinutes > 0 ? (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-3xl font-extrabold text-neutral-900 tabular-nums">
+                  {goalPercentage}%
+                </span>
+                <span className="text-xs font-medium text-neutral-500">
+                  {isGoalMet ? 'Batida ✓' : 'Em Andamento'}
+                </span>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isGoalMet ? 'bg-emerald-500' : 'bg-indigo-600'
+                  }`}
+                  style={{ width: `${Math.min(100, goalPercentage)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <span className="text-lg font-bold text-neutral-700 block">Zerada (0 min)</span>
+              <span className="text-xs text-neutral-400 mt-1 block">
+                Insira sua meta nas configurações quando desejar
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Status of the Day */}
