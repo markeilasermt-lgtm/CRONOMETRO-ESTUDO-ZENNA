@@ -1,0 +1,6 @@
+{
+  "name": "EstudoFlux - Calendário de Prática Musical & Metas",
+  "description": "Calendário simples e direto de estudo musical com cronômetro regressivo, relatórios diários e mensais de tempo praticado e recompensas visuais por metas batidas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
